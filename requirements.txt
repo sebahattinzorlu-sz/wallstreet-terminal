@@ -1,5 +1,4 @@
-Plaintext
-streamlit
-pandas
-yfinance
-pandas-ta
+streamlit==1.35.0
+pandas==2.2.2
+yfinance==0.2.40
+pandas-ta==0.3.14b0
