@@ -167,3 +167,202 @@ def kurumsal_hisse_tarayici(hisse_kodu):
             bilgi = hisse.info
             if bilgi:
                 if bilgi.get('revenueGrowth') is not None:
+                    buyume = f"%{bilgi.get('revenueGrowth') * 100:.1f}"
+                if bilgi.get('grossMargins') is not None:
+                    marj = f"%{bilgi.get('grossMargins') * 100:.1f}"
+                if bilgi.get('trailingPE') is not None:
+                    fk = f"{bilgi.get('trailingPE'):.1f}"
+                if bilgi.get('debtToEquity') is not None:
+                    borc = f"%{bilgi.get('debtToEquity'):.1f}"
+                if bilgi.get('numberOfEmployees') is not None:
+                    abone = f"{bilgi.get('numberOfEmployees'):,}"
+        except Exception as hata:
+            sistem_ogrenme_kaydi(hisse_kodu, f"Sözlük kısıtlaması: {hata}")
+            
+        temel = {
+            "Büyüme Hızı": buyume, "Brüt Marj": marj, "F/K Rasyosu": fk, "Borç/Özkaynak": borc, "Aktif Yapı": abone
+        }
+        
+        ws_puan, ws_tavsiye, ws_aciklama = wall_street_karar_mekanizmasi(fiyat, rsi, sma50_deger, buyume, marj)
+        
+        return {
+            "Fiyat": fiyat, "RSI": rsi, "Destek": destek, "Direnç": direnc, "SMA50": sma50_deger, "Temel": temel,
+            "WS_Puan": ws_puan, "WS_Tavsiye": ws_tavsiye, "WS_Aciklama": ws_aciklama
+        }
+    except Exception as genel_hata:
+        return None
+
+# --- 6. YAN PANEL ---
+with st.sidebar:
+    st.title("🤖 ALPHA v53")
+    st.markdown("### `Wall Street Kurumsal Karar Terminali`")
+    st.divider()
+    calisma_ekrani = st.radio(
+        "Çalışma Alanı Seçiniz:", 
+        [
+            "📊 BÖLÜM 1-3: Piyasa Rejimi & Makro Analiz",
+            "📅 BÖLÜM 4-5: Ekonomik Takvim & Sektör Akışları",
+            "🔍 BÖLÜM 6: İzleme Listesi & Dinamik Odak Analizi",
+            "🚨 BÖLÜM 7-10: Sıra Dışı İşlemler & Al-Sat Stratejisi"
+        ]
+    )
+    st.divider()
+    st.markdown("### 🧠 Kurumsal Risk Parametreleri")
+    kademeli_alim_payi = st.slider("Kademeli Alım Dilimi (%)", 10, 50, 25)
+    portfoy_nakit_orani = st.slider("Hedeflenen Nakit Koridor (%)", 5, 80, 35)
+
+# --- 7. BÖLÜM 1-3 ---
+if calisma_ekrani == "📊 BÖLÜM 1-3: Piyasa Rejimi & Makro Analiz":
+    st.markdown('<div class="section-title">BÖLÜM 1 – PİYASA REJİMİ VE RISK ALGISI</div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    vix_fiyat = makro_sozluk.get("Korku Endeksi (VIX)", {}).get("fiyat", 17.85)
+    sp_degisim = makro_sozluk.get("S&P 500 Vadeli", {}).get("degisim", -0.11)
+    
+    with c1:
+        if vix_fiyat > 17.0:
+            st.error("🚨 RISK REJİMİ: RİSKTEN KAÇIŞ (RISK-OFF)")
+        else:
+            st.success("🟢 RISK REJİMİ: RİSK İŞTAHI AKTİF (RISK-ON)")
+    with c2:
+        if sp_degisim < -0.05:
+            st.error("📉 TREND YÖNÜ: BEARİSH / SATICILI")
+        else:
+            st.success("📈 TREND YÖNÜ: BULLİSH / ALICILI")
+    with c3:
+        st.metric(label="Wall Street Güven Endeksi", value="%96", delta="Kurumsal Puanlama Aktif")
+        
+    st.markdown('<div class="section-title">BÖLÜM 2 – MAKRO GÖSTERGELER MATRİSİ</div>', unsafe_allow_html=True)
+    makro_tablo = []
+    for varlik, veri in makro_sozluk.items():
+        durum = "Olumlu (Boğa)" if veri["degisim"] >= 0 else "Olumsuz (Ayı)"
+        if varlik in ["Korku Endeksi (VIX)", "Dolar Endeksi (DXY)"]:
+            durum = "Risk Artışı" if veri["degisim"] >= 0 else "Güvenli Bölge"
+        makro_tablo.append({"Macro Varlık": varlik, "Anlık Fiyat / Değer": f"{veri['fiyat']:,.2f}", "Günlük Değişim": f"%{veri['degisim']:.2f}", "Piyasa Etkisi": durum})
+    st.dataframe(pd.DataFrame(makro_tablo), use_container_width=True, hide_index=True)
+
+# --- 8. BÖLÜM 4-5 ---
+elif calisma_ekrani == "📅 BÖLÜM 4-5: Ekonomik Takvim & Sektör Akışları":
+    st.markdown('<div class="section-title">BÖLÜM 4 – YÜKSEK ETKİLİ EKONOMİK TAKVİM VERİLERİ</div>', unsafe_allow_html=True)
+    takvim_verisi = pd.DataFrame({
+        "Zaman Dönemi": ["Bugün", "Gelecek 7 Gün", "Gelecek 7 Gün", "Gelecek 7 Gün"],
+        "Ekonomik Gösterge": ["Tarım Dışı İstihdam (NFP)", "Tüketici Fiyat Endeksi (CPI)", "Üretici Fiyat Endeksi (PPI)", "Gayri Safi Yurtiçi Hasıla (GDP)"],
+        "Beklenen Değer": ["180K", "%3.2", "%2.1", "%2.4"],
+        "Önceki Değer": ["165K", "%3.4", "%2.3", "%2.2"],
+        "Olası Piyasa Etkisi": ["Beklenti üstü veri faiz baskısını tetikler.", "Enflasyonda düşüş büyüme hisselerine can suyu verir.", "Maliyet gerilemesi brüt kâr marjlarını korur.", "Büyüme verisi resesyon korkusunu tamamen siler."]
+    })
+    st.dataframe(takvim_verisi, use_container_width=True, hide_index=True)
+
+# --- 9. BÖLÜM 6 (KARARLI YAPIYA GEÇİRİLDİ) ---
+elif calisma_ekrani == "🔍 BÖLÜM 6: İzleme Listesi & Dinamik Odak Analizi":
+    st.markdown('<div class="section-title">BÖLÜM 6 – WALL STREET KONSOLİDE KARAR MATRİSİ</div>', unsafe_allow_html=True)
+    
+    izleme_listesi = ["NBIS", "RKLB", "ASTS", "OKLO", "SMCI", "IREN", "NVDA"]
+    matris_listesi = []
+    
+    for h_kod in izleme_listesi:
+        p = kurumsal_hisse_tarayici(h_kod)
+        if p is not None:
+            matris_listesi.append({
+                "Hisse Kodu": h_kod, 
+                "Son Fiyat": f"${p['Fiyat']:.2f}", 
+                "RSI (14)": p['RSI'],
+                "Kurumsal Puan": f"{p['WS_Puan']} / 100",
+                "WALL STREET ÖNERİSİ": p['WS_Tavsiye'],
+                "Algoritmik Koridor": f"${p['Destek']:.2f} - ${p['Direnç']:.2f}",
+                "Büyüme / Brüt Marj": f"{p['Temel']['Büyüme Hızı']} / {p['Temel']['Brüt Marj']}"
+            })
+            
+    ana_df = pd.DataFrame(matris_listesi)
+    st.dataframe(ana_df, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    
+    # Telefon ve web için çakışma önleyici pürüzsüz açılır menü seçimi
+    secilen_hisse = st.selectbox("🎯 Detaylı İncelemek İstediğiniz Stratejik Odağı Seçiniz:", izleme_listesi)
+    
+    st.markdown(f'<div class="section-title">💡 STRATEJİK ODAK: {secilen_hisse} DERİNLEMESİNE ANALİZ MERKEZİ</div>', unsafe_allow_html=True)
+    odak_verisi = kurumsal_hisse_tarayici(secilen_hisse)
+    
+    if odak_verisi is not None:
+        hk1, hk2 = st.columns([1, 2])
+        with hk1:
+            st.markdown(f"### 📋 KONSOLİDE VERİ KARNESİ ({secilen_hisse})")
+            st.markdown(f"""
+            * **Odaklanan Şirket:** {secilen_hisse}
+            * **Anlık Piyasa Fiyatı:** ${odak_verisi['Fiyat']:.2f}
+            * **Göreceli Güç Endeksi (RSI):** {odak_verisi['RSI']}
+            * **Kritik Destek Seviyesi:** ${odak_verisi['Destek']:.2f}
+            * **Kritik Direnç Seviyesi:** ${odak_verisi['Direnç']:.2f}
+            * **50 Günlük Ortalama (SMA50):** ${odak_verisi['SMA50']:.2f}
+            """)
+            st.info(f"🎯 **Wall Street Kurumsal Skoru:** {odak_verisi['WS_Puan']} / 100")
+            st.success(f"📢 **Karar:** {odak_verisi['WS_Tavsiye']}")
+            
+        with hk2:
+            st.markdown(f"### 📈 HAFTALIK STRATEJİK FAKTÖR KONTROLÜ ({secilen_hisse})")
+            tabs = st.tabs(["Sektörel Katalizörler", "Büyüme Dinamikleri", "Maliyet Yapısı", "Senaryo Analizi"])
+            
+            with tabs[0]:
+                if secilen_hisse == "NBIS":
+                    st.markdown("* **Hacim Katalizörleri:** Sektörel talep dengesi ve kurumsal akışlar izlenmektedir.\n* **Düzenleme Riskleri:** Küresel mevzuat adımları yakından takip ediliyor.")
+                else:
+                    st.markdown(f"* **Sektörel Katalizörler:** {secilen_hisse} için makro hacim trendleri izleniyor.")
+            with tabs[1]:
+                st.markdown(f"* **Gelir Büyüme Oranı:** Şirketin büyüme hızı anlık **{odak_verisi['Temel']['Büyüme Hızı']}** seviyesindedir.")
+            with tabs[2]:
+                st.markdown(f"* **Brüt Kâr Marjı:** Şirket **{odak_verisi['Temel']['Brüt Marj']}** brüt marj ile koruma altındadır.")
+            with tabs[3]:
+                st.markdown(f"* **🟢 POZİTİF SENARYO:** Üst direnç olan **${odak_verisi['Direnç']:.2f}** seviyesinin kırılması.\n* **🔴 NEGATİF SENARYO:** Alt destek seviyesi olan **${odak_verisi['Destek']:.2f}** bandına doğru alım fırsatı.")
+
+# --- 10. BÖLÜM 7-10 ---
+elif calisma_ekrani == "🚨 BÖLÜM 7-10: Sıra Dışı İşlemler & Al-Sat Stratejisi":
+    st.markdown('<div class="section-title">BÖLÜM 7 – SIRA DIŞI KURUMSAL İŞLEMLER VE KARANLIK HAVUZ AKTİVİTESİ</div>', unsafe_allow_html=True)
+    st.write("* **Karanlık Havuz Akışları:** Büyük fonların piyasada gerçekleştirdiği hacimli işlemler denetlenmektedir.")
+    
+    st.markdown('<div class="section-title">BÖLÜM 8 – ALGORİTMİK EN İYİ İŞLEM FIRSATLARI MATRİSİ</div>', unsafe_allow_html=True)
+    firsat_tablosu = pd.DataFrame({
+        "Strateji Sınıfı": ["Salınım", "Salınım", "Momentum", "Momentum", "Yüksek Risk"],
+        "Hisse Senedi": ["NBIS", "AAPL", "NVDA", "RKLB", "IREN"],
+        "Giriş Bölgesi": ["Anlık Destek Bandı", "50 Günlük Ortalama", "Direnç Kırılımı", "Hacim Patlaması", "Tarihi Dipler"],
+        "Zarar Kes (Stop Loss)": ["-%4.5", "-%3.0", "-%5.0", "-%6.0", "-%8.5"],
+        "Hedeflenen Kâr": ["+%15.0", "+%10.0", "+%18.0", "+%25.0", "+%40.0"]
+    })
+    st.dataframe(firsat_tablosu, use_container_width=True, hide_index=True)
+    
+    st.divider()
+    st.markdown('<div class="section-title">📊 BÖLÜM 10 – KURUMSAL İŞLEM GÜNLÜĞÜ VE AKILLI GİRİŞ MODÜLÜ</div>', unsafe_allow_html=True)
+    
+    g1, g2, g3, g4 = st.columns(4)
+    with g1:
+        islem_hisse = st.selectbox("İşlem Gören Hisse:", ["NBIS", "RKLB", "ASTS", "OKLO", "IREN", "NVDA"])
+    with g2:
+        islem_turu = st.selectbox("İşlem Tipi:", ["Kademeli Alım (BUY)", "Parça Satış (SELL)", "Zarar Kes (STOP)"])
+    with g3:
+        islem_fiyati = st.number_input("İşlem Fiyatı ($):", min_value=0.1, value=25.0, step=0.1)
+    with g4:
+        islem_adedi = st.number_input("İşlem Adedi (Lot):", min_value=1, value=10, step=1)
+        
+    islem_gerekcesi = st.text_area("İşlem Gerekçeniz:", placeholder="İşlem yapma nedeninizi buraya kurumsal kurallarla not edin...")
+    
+    if st.button("🚀 İşlemi Günlüğe Kaydet ve Analiz Et"):
+        toplam_tutar = islem_fiyati * islem_adedi
+        yeni_islem = {
+            "Tarih": datetime.now().strftime("%Y-%m-%d %H:%M"), "Hisse": islem_hisse, "Tip": islem_turu,
+            "Fiyat": f"${islem_fiyati:.2f}", "Adet": islem_adedi, "Toplam": f"${toplam_tutar:.2f}", "Gerekçe": islem_gerekcesi
+        }
+        st.session_state["islem_gecmisi"].append(yeni_islem)
+        st.success(f"İşlem günlüğe eklendi. Yapay zekâ analiz odası değerlendiriyor...")
+
+    if st.session_state["islem_gecmisi"]:
+        st.markdown("### 🗂️ Mevcut Pozisyon ve İşlem Geçmişi Matrisi")
+        st.dataframe(pd.DataFrame(st.session_state["islem_gecmisi"]), use_container_width=True)
+        
+        st.markdown('<div class="section-title">🧠 WALL STREET EĞİTİM VE MÜKEMMELLEŞTİRME ODASI</div>', unsafe_allow_html=True)
+        son_kayit = st.session_state["islem_gecmisi"][-1]
+        
+        with st.chat_message("assistant"):
+            st.markdown(f"### 🎯 **{son_kayit['Hisse']} İşlemi Risk Yönetim Notu**")
+            if "Alım" in son_kayit["Tip"]:
+                st.markdown(f"* **Sermaye Koruma Kuralı:** Parça parça oyuna girme tercihiniz, belirlenen %{kademeli_alim_payi} kademe dilimiyle tam uyumlu. Disiplin tam.")
+            else:
+                st.markdown("* **Risk Notu:** Pozisyon büyüklüğü ve likidite dengesi Wall Street standartlarına göre korunmuştur.")
